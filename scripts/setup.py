@@ -2,12 +2,12 @@
 import os
 import platform
 import shutil
-import stat
+import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-OUTPUT = SCRIPT_DIR / "browser_setup.py"
 DEBUG_PROFILE_DIR = Path.home() / "tmp" / "chrome-debug"
 PROFILE_IGNORE = shutil.ignore_patterns(
     "Cache",
@@ -22,18 +22,6 @@ PROFILE_IGNORE = shutil.ignore_patterns(
     "Crashpad",
 )
 
-TEMPLATE = '''#!/usr/bin/env python3
-import os
-import platform
-import subprocess
-import sys
-import urllib.request
-import urllib.error
-
-PLATFORM = {platform!r}
-USER_DATA_DIR = {user_data_dir!r}
-CHROME_EXE = {chrome_exe!r}
-
 CHROME_FLAGS = [
     "--remote-debugging-port=9222",
     "--remote-debugging-address=127.0.0.1",
@@ -43,53 +31,6 @@ CHROME_FLAGS = [
     "--disable-features=AutomationControlled",
     "--excludeSwitches=enable-automation",
 ]
-
-
-def debug_port_alive() -> bool:
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:9222/json/version", timeout=1):
-            return True
-    except (urllib.error.URLError, TimeoutError, OSError):
-        return False
-
-
-def launch() -> None:
-    user_data_arg = f"--user-data-dir={{USER_DATA_DIR}}"
-
-    if PLATFORM == "darwin":
-        subprocess.run(
-            ["open", "-na", "Google Chrome", "--args", *CHROME_FLAGS, user_data_arg],
-            check=True,
-        )
-    elif PLATFORM in ("windows", "linux"):
-        if not CHROME_EXE:
-            print(f"chrome executable not configured for {{PLATFORM}}", file=sys.stderr)
-            sys.exit(1)
-        kwargs = {{"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}}
-        if PLATFORM == "windows":
-            DETACHED_PROCESS = 0x00000008
-            CREATE_NEW_PROCESS_GROUP = 0x00000200
-            kwargs["creationflags"] = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
-        else:
-            kwargs["start_new_session"] = True
-        subprocess.Popen([CHROME_EXE, *CHROME_FLAGS, user_data_arg], **kwargs)
-    else:
-        print(f"Unsupported platform: {{PLATFORM}}", file=sys.stderr)
-        sys.exit(1)
-
-
-def main() -> None:
-    if debug_port_alive():
-        print("Chrome debug already running on port 9222")
-        return
-    launch()
-    print("Chrome launched with debug port 9222")
-    print(f"User data dir: {{USER_DATA_DIR}}")
-
-
-if __name__ == "__main__":
-    main()
-'''
 
 
 def detect_windows() -> tuple[str, str]:
@@ -139,17 +80,6 @@ def detect_windows() -> tuple[str, str]:
     return user_data_dir, chrome_exe
 
 
-def clone_profile(src: Path) -> Path:
-    dest = DEBUG_PROFILE_DIR
-    if dest.exists():
-        print(f"Debug profile exists, reusing: {dest}")
-        return dest
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Cloning profile {src} -> {dest}")
-    shutil.copytree(src, dest, ignore=PROFILE_IGNORE, symlinks=True)
-    return dest
-
-
 def detect_linux() -> tuple[str, str]:
     user_data_dir = ""
     home = Path.home()
@@ -161,22 +91,73 @@ def detect_linux() -> tuple[str, str]:
     return user_data_dir, chrome_exe
 
 
-def main() -> None:
+def detect() -> tuple[str, str, str]:
     system = platform.system()
-    chrome_exe = ""
-
+    if system == "Darwin":
+        return (
+            "darwin",
+            str(Path.home() / "Library" / "Application Support" / "Google" / "Chrome"),
+            "",
+        )
     if system == "Windows":
-        plat = "windows"
-        user_data_dir, chrome_exe = detect_windows()
-    elif system == "Darwin":
-        plat = "darwin"
-        user_data_dir = str(Path.home() / "Library" / "Application Support" / "Google" / "Chrome")
-    elif system == "Linux":
-        plat = "linux"
-        user_data_dir, chrome_exe = detect_linux()
-    else:
-        print(f"Unsupported OS: {system}", file=sys.stderr)
-        sys.exit(1)
+        ud, exe = detect_windows()
+        return "windows", ud, exe
+    if system == "Linux":
+        ud, exe = detect_linux()
+        return "linux", ud, exe
+    print(f"Unsupported OS: {system}", file=sys.stderr)
+    sys.exit(1)
+
+
+def clone_profile(src: Path) -> Path:
+    dest = DEBUG_PROFILE_DIR
+    if dest.exists():
+        print(f"Debug profile exists, reusing: {dest}")
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Cloning profile {src} -> {dest}")
+    shutil.copytree(src, dest, ignore=PROFILE_IGNORE, symlinks=True)
+    return dest
+
+
+def debug_port_alive() -> bool:
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:9222/json/version", timeout=1):
+            return True
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False
+
+
+def launch(plat: str, user_data_dir: str, chrome_exe: str) -> None:
+    user_data_arg = f"--user-data-dir={user_data_dir}"
+
+    if plat == "darwin":
+        subprocess.run(
+            ["open", "-na", "Google Chrome", "--args", *CHROME_FLAGS, user_data_arg],
+            check=True,
+        )
+        return
+
+    if plat in ("windows", "linux"):
+        if not chrome_exe:
+            print(f"chrome executable not configured for {plat}", file=sys.stderr)
+            sys.exit(1)
+        kwargs = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+        if plat == "windows":
+            DETACHED_PROCESS = 0x00000008
+            CREATE_NEW_PROCESS_GROUP = 0x00000200
+            kwargs["creationflags"] = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        else:
+            kwargs["start_new_session"] = True
+        subprocess.Popen([chrome_exe, *CHROME_FLAGS, user_data_arg], **kwargs)
+        return
+
+    print(f"Unsupported platform: {plat}", file=sys.stderr)
+    sys.exit(1)
+
+
+def main() -> None:
+    plat, user_data_dir, chrome_exe = detect()
 
     if not user_data_dir or not Path(user_data_dir).is_dir():
         print(f"Chrome user data directory not found on {plat}", file=sys.stderr)
@@ -188,21 +169,18 @@ def main() -> None:
 
     debug_dir = clone_profile(Path(user_data_dir))
 
-    OUTPUT.write_text(
-        TEMPLATE.format(
-            platform=plat,
-            user_data_dir=str(debug_dir),
-            chrome_exe=chrome_exe,
-        )
-    )
-    OUTPUT.chmod(OUTPUT.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-    print(f"Generated: {OUTPUT}")
     print(f"Platform: {plat}")
     print(f"Source profile: {user_data_dir}")
     print(f"Debug profile: {debug_dir}")
     if chrome_exe:
         print(f"Chrome exe: {chrome_exe}")
+
+    if debug_port_alive():
+        print("Chrome debug already running on port 9222")
+        return
+
+    launch(plat, str(debug_dir), chrome_exe)
+    print("Chrome launched with debug port 9222")
 
 
 if __name__ == "__main__":
