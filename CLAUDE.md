@@ -1,1 +1,2 @@
-python3로 scripts/setup.py 를 실행이 안되어 있으면 해줘야해
+For website extraction tasks, follow [crawling-starter/SKILL.md](crawling-starter/SKILL.md).
+See [README.md](README.md) for installation and a first crawl.
