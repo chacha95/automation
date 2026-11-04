@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check Aside CLI and install the crawling skill for Codex and Claude Code."""
+"""Install the crawling skill and report whether Aside is ready."""
 
 import shutil
 import subprocess
@@ -9,14 +9,18 @@ from pathlib import Path
 
 SKILL_NAME = "crawling-starter"
 SKILL_FILE = Path(__file__).resolve().parents[1] / SKILL_NAME / "SKILL.md"
+ASIDE_DOWNLOAD_URL = "https://aside.com/download"
 ASIDE_SETUP_URL = "https://docs.aside.com/help/developers#install-the-cli"
 READY = "CRAWLING_STARTER_READY"
 
 
 def check_aside() -> None:
-    aside = shutil.which("aside")
+    aside = shutil.which("aside") or shutil.which(str(Path.home() / ".local/bin/aside"))
     if aside is None:
-        raise RuntimeError(f"Aside CLI를 설치하고 터미널을 다시 열어 주세요. {ASIDE_SETUP_URL}")
+        raise RuntimeError(
+            f"Aside를 설치하고 앱에서 로그인해 주세요. {ASIDE_DOWNLOAD_URL}\n"
+            f"앱을 열었으면 개발자 설정에서 Aside CLI를 설치해 주세요. {ASIDE_SETUP_URL}"
+        )
 
     result = subprocess.run(
         [aside, "repl", f'if (typeof openTab === "function") console.log("{READY}");'],
@@ -44,15 +48,21 @@ def install_skill() -> None:
 
 def main() -> int:
     try:
-        check_aside()
         install_skill()
+    except OSError as error:
+        print(f"스킬을 설치할 수 없어요. {error}", file=sys.stderr)
+        return 1
+
+    try:
+        check_aside()
     except subprocess.TimeoutExpired:
-        print("Aside CLI 연결 시간이 초과됐어요. Aside 앱을 열고 다시 실행해 주세요.", file=sys.stderr)
-        return 1
+        print("Aside CLI 연결 시간이 초과됐어요. Aside 앱을 열고 연결을 확인해 주세요.", file=sys.stderr)
     except (OSError, RuntimeError) as error:
-        print(error, file=sys.stderr)
-        return 1
-    print("새 Codex 또는 Claude Code 세션에서 crawling-starter 스킬을 사용해 주세요.")
+        print(f"크롤링을 시작하려면 Aside 설정이 필요해요. {error}", file=sys.stderr)
+    else:
+        print("Aside CLI 연결을 확인했어요.")
+
+    print('새 Codex 또는 Claude Code 세션에서 "crawling-starter 스킬 설정을 도와줘"라고 입력해 주세요.')
     return 0
 
 
