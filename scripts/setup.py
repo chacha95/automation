@@ -8,7 +8,10 @@ import tempfile
 from pathlib import Path
 
 SKILL_NAME = "crawling-starter"
-SKILL_FILE = Path(__file__).resolve().parents[1] / SKILL_NAME / "SKILL.md"
+PACKAGE_DIR = Path(__file__).resolve().parents[1]
+SKILL_FILE = PACKAGE_DIR / SKILL_NAME / "SKILL.md"
+if not SKILL_FILE.is_file():
+    SKILL_FILE = PACKAGE_DIR / "SKILL.md"
 ASIDE_DOWNLOAD_URL = "https://aside.com/download"
 ASIDE_SETUP_URL = "https://docs.aside.com/help/developers#install-the-cli"
 READY = "CRAWLING_STARTER_READY"
