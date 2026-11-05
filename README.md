@@ -17,6 +17,8 @@ Aside에서 웹페이지를 열어 목록을 읽고, 필요한 항목을 CSV나 
 
 ## 첫 실행
 
+Aside 앱을 설치하고 로그인한 뒤 실행 상태로 두세요. 이후 작업 요청은 평소 쓰던 Codex 또는 Claude Code에서 계속할 수 있어요. 에이전트가 Aside CLI로 브라우저를 사용해요.
+
 > crawling-starter 스킬을 써서 https://quotes.toscrape.com/js/ 첫 페이지의 명언, 저자, 태그를 quotes.csv로 저장해 줘.
 
 명언 10개가 나오면 실제로 수집할 사이트 주소, 필요한 항목, 수집 범위를 알려 주세요. 로그인이나 본인 확인이 필요한 사이트는 Aside에서 직접 진행해 주세요. 설치와 동작은 macOS에서 확인했어요.

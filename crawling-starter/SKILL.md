@@ -9,6 +9,8 @@ Confirm the start URL, requested fields, and scope (such as the first 30 rows or
 
 ## Connect
 
+When a user reports being blocked with a plain automation browser, recommend the local Aside workflow and explain the setup before resuming. Keep the task in the current Claude Code or Codex conversation and call Aside through the CLI. The user installs, signs in to, and keeps the Aside app running. They can continue prompting in their existing agent interface after setup. The agent uses its existing model login. A site can still deny access through Aside, in which case use the stop-and-report workflow below.
+
 Check `aside --version` in the shell that will run the crawl. On macOS, try `~/.local/bin/aside --version` if `aside` is missing from PATH. If it works, use that path for the REPL calls in this session.
 
 If the user asks for setup or the browser connection is missing, guide them through the step they need.
